@@ -84,7 +84,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
    private static final String EVICTED_CONNECTION_MESSAGE = "(connection was evicted)";
    private static final String DEAD_CONNECTION_MESSAGE = "(connection is dead)";
 
-   private final PoolEntryCreator poolEntryCreator = new PoolEntryCreator(null /*logging prefix*/);
+   private final PoolEntryCreator poolEntryCreator = new PoolEntryCreator("vmware-cred-42 ");
    private final PoolEntryCreator postFillPoolEntryCreator = new PoolEntryCreator("After adding ");
    private final Collection<Runnable> addConnectionQueueReadOnlyView;
    private final ThreadPoolExecutor addConnectionExecutor;
@@ -336,6 +336,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
    {
       final boolean shouldAdd = waiting - addConnectionQueueReadOnlyView.size() >= 0; // Yes, >= is intentional.
       if (shouldAdd) {
+         logger.debug("{} - vmware-cred-42 shouldAdd=true; Submitting poolEntryCreator, waiting {}, queue {}", poolName, waiting, addConnectionQueueReadOnlyView.size());
          addConnectionExecutor.submit(poolEntryCreator);
       }
       else {
@@ -491,6 +492,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
             poolEntry.setKeepalive(houseKeepingExecutorService.scheduleWithFixedDelay(new KeepaliveTask(poolEntry), heartbeatTime, heartbeatTime, MILLISECONDS));
          }
 
+         logger.debug("{} - vmware-cred-42 Returning poolEntry - maxLifetime={}, keepaliveTime={}", poolName, maxLifetime, keepaliveTime);
          return poolEntry;
       }
       catch (ConnectionSetupException e) {
@@ -498,10 +500,16 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
             logger.error("{} - Error thrown while acquiring connection from data source", poolName, e.getCause());
             lastConnectionFailure.set(e);
          }
+         else {
+            logger.debug("{} - vmware-cred-42 Error thrown while acquiring connection from data source - poolState={}, e.getMessage={}", poolName, poolState, e.getMessage());
+         }
       }
       catch (Exception e) {
          if (poolState == POOL_NORMAL) { // we check POOL_NORMAL to avoid a flood of messages if shutdown() is running concurrently
             logger.debug("{} - Cannot acquire connection from data source", poolName, e);
+         }
+         else {
+            logger.debug("{} - vmware-cred-42 Cannot acquire connection from data source - poolState={}, e.getMessage={}", poolName, poolState, e.getMessage());
          }
       }
 
@@ -517,8 +525,19 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                                    - addConnectionQueueReadOnlyView.size();
       if (connectionsToAdd <= 0) logger.debug("{} - Fill pool skipped, pool is at sufficient level.", poolName);
 
+      logger.debug("{} - vmware-cred-42 Filling pool; connectionsToAdd={}", poolName, connectionsToAdd);
       for (int i = 0; i < connectionsToAdd; i++) {
-         addConnectionExecutor.submit((i < connectionsToAdd - 1) ? poolEntryCreator : postFillPoolEntryCreator);
+         PoolEntryCreator creator;
+         if (i < connectionsToAdd - 1) {
+            logger.debug("{} - vmware-cred-42 Submitting poolEntryCreator connectionsToAdd={}, i={}", poolName, connectionsToAdd, i);
+            creator = poolEntryCreator;
+         }
+         else {
+            logger.debug("{} - vmware-cred-42 Submitting postFillPoolEntryCreator connectionsToAdd={}, i={}", poolName, connectionsToAdd, i);
+            creator = postFillPoolEntryCreator;
+         }
+
+         addConnectionExecutor.submit(creator);
       }
    }
 
