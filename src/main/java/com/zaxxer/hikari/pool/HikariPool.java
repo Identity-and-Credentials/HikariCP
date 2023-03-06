@@ -750,7 +750,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       @Override
       public Boolean call()
       {
-         logger.debug("vmware-cred-42-100 PoolEntryCreator.call()");
+         logger.debug("vmware-cred-42-100 PoolEntryCreator.call(); prefix={}", loggingPrefix);
          long sleepBackoff = 250L;
          while (poolState == POOL_NORMAL && shouldCreateAnotherConnection()) {
             logger.debug("vmware-cred-42-110 PoolEntryCreator.call() in while loop");
