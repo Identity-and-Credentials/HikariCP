@@ -525,7 +525,17 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                                    - addConnectionQueueReadOnlyView.size();
       if (connectionsToAdd <= 0) logger.debug("{} - Fill pool skipped, pool is at sufficient level.", poolName);
 
-      logger.debug("{} - vmware-cred-42 Filling pool; connectionsToAdd={}", poolName, connectionsToAdd);
+      logger.debug(
+         "{} - vmware-cred-42 Filling pool; connectionsToAdd={}; MaximumPoolSize={}; totalConnections={}; minimumIdle={}; currentIdle={}; currentConnectionQueueSize={}",
+         poolName,
+         connectionsToAdd,
+         config.getMaximumPoolSize(),
+         getTotalConnections(),
+         config.getMinimumIdle(),
+         getIdleConnections(),
+         addConnectionQueueReadOnlyView.size()
+         );
+
       for (int i = 0; i < connectionsToAdd; i++) {
          PoolEntryCreator creator;
          if (i < connectionsToAdd - 1) {
