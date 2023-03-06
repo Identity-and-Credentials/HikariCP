@@ -750,8 +750,10 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       @Override
       public Boolean call()
       {
+         logger.debug("vmware-cred-42-100 PoolEntryCreator.call()");
          long sleepBackoff = 250L;
          while (poolState == POOL_NORMAL && shouldCreateAnotherConnection()) {
+            logger.debug("vmware-cred-42-110 PoolEntryCreator.call() in while loop");
             final PoolEntry poolEntry = createPoolEntry();
             if (poolEntry != null) {
                connectionBag.add(poolEntry);
@@ -759,6 +761,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                if (loggingPrefix != null) {
                   logPoolState(loggingPrefix);
                }
+               logger.debug("vmware-cred-42-111 PoolEntryCreator.call() returning TRUE");
                return Boolean.TRUE;
             }
 
@@ -769,6 +772,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
          }
 
          // Pool is suspended or shutdown or at max size
+         logger.debug("vmware-cred-42-190 PoolEntryCreator.call() returning FALSE");
          return Boolean.FALSE;
       }
 
