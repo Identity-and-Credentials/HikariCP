@@ -130,8 +130,8 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       final int maxPoolSize = config.getMaximumPoolSize();
       LinkedBlockingQueue<Runnable> addConnectionQueue = new LinkedBlockingQueue<>(maxPoolSize);
       this.addConnectionQueueReadOnlyView = unmodifiableCollection(addConnectionQueue);
-      this.addConnectionExecutor = createThreadPoolExecutor(addConnectionQueue, poolName + " connection adder", threadFactory, new ThreadPoolExecutor.DiscardOldestPolicy());
-      this.closeConnectionExecutor = createThreadPoolExecutor(maxPoolSize, poolName + " connection closer", threadFactory, new ThreadPoolExecutor.CallerRunsPolicy());
+      this.addConnectionExecutor = createThreadPoolExecutor(addConnectionQueue, poolName + " connection adder", threadFactory, new DebugDiscardOldestPolicy());
+      this.closeConnectionExecutor = createThreadPoolExecutor(maxPoolSize, poolName + " connection closer", threadFactory, new DebugCallerRunsPolicy());
 
       this.leakTaskFactory = new ProxyLeakTaskFactory(config.getLeakDetectionThreshold(), houseKeepingExecutorService);
 
@@ -446,14 +446,32 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
     */
    void closeConnection(final PoolEntry poolEntry, final String closureReason)
    {
+      logger.debug(
+         "vmware-cred-42-300 in closeConnection(); poolEntry={}; reason={}",
+         poolEntry.getPoolName(),
+         closureReason
+      );
       if (connectionBag.remove(poolEntry)) {
+         logger.debug(
+            "vmware-cred-42-310 remove; poolEntry={}",
+            poolEntry.getPoolName()
+         );
          final Connection connection = poolEntry.close();
          closeConnectionExecutor.execute(() -> {
             quietlyCloseConnection(connection, closureReason);
             if (poolState == POOL_NORMAL) {
+               logger.debug(
+                  "vmware-cred-42-311 now filling the pool; poolEntry={}",
+                  poolEntry.getPoolName()
+               );
                fillPool();
             }
          });
+      } else {
+         logger.debug(
+            "vmware-cred-42-320 NOT removed; poolEntry={};",
+            poolEntry.getPoolName()
+         );
       }
    }
 
@@ -525,7 +543,17 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                                    - addConnectionQueueReadOnlyView.size();
       if (connectionsToAdd <= 0) logger.debug("{} - Fill pool skipped, pool is at sufficient level.", poolName);
 
-      logger.debug("{} - vmware-cred-42 Filling pool; connectionsToAdd={}", poolName, connectionsToAdd);
+      logger.debug(
+         "{} - vmware-cred-42 Filling pool; connectionsToAdd={}; MaximumPoolSize={}; totalConnections={}; minimumIdle={}; currentIdle={}; currentConnectionQueueSize={}",
+         poolName,
+         connectionsToAdd,
+         config.getMaximumPoolSize(),
+         getTotalConnections(),
+         config.getMinimumIdle(),
+         getIdleConnections(),
+         addConnectionQueueReadOnlyView.size()
+         );
+
       for (int i = 0; i < connectionsToAdd; i++) {
          PoolEntryCreator creator;
          if (i < connectionsToAdd - 1) {
@@ -740,8 +768,10 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       @Override
       public Boolean call()
       {
+         logger.debug("vmware-cred-42-100 PoolEntryCreator.call(); prefix={}", loggingPrefix);
          long sleepBackoff = 250L;
          while (poolState == POOL_NORMAL && shouldCreateAnotherConnection()) {
+            logger.debug("vmware-cred-42-110 PoolEntryCreator.call() in while loop");
             final PoolEntry poolEntry = createPoolEntry();
             if (poolEntry != null) {
                connectionBag.add(poolEntry);
@@ -749,6 +779,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                if (loggingPrefix != null) {
                   logPoolState(loggingPrefix);
                }
+               logger.debug("vmware-cred-42-111 PoolEntryCreator.call() returning TRUE");
                return Boolean.TRUE;
             }
 
@@ -759,6 +790,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
          }
 
          // Pool is suspended or shutdown or at max size
+         logger.debug("vmware-cred-42-190 PoolEntryCreator.call() returning FALSE");
          return Boolean.FALSE;
       }
 
@@ -886,6 +918,25 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       public PoolInitializationException(Throwable t)
       {
          super("Failed to initialize pool: " + t.getMessage(), t);
+      }
+   }
+
+   private class DebugCallerRunsPolicy extends ThreadPoolExecutor.CallerRunsPolicy {
+
+      public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+         logger.debug(
+            "vmware-cred-42-410 rejected execution"
+         );
+         super.rejectedExecution(r,e);
+      }
+   }
+
+   private class DebugDiscardOldestPolicy extends ThreadPoolExecutor.DiscardOldestPolicy {
+      public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+         logger.debug(
+            "vmware-cred-42-420 rejected execution"
+         );
+         super.rejectedExecution(r,e);
       }
    }
 }
