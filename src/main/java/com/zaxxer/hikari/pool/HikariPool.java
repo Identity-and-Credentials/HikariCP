@@ -446,14 +446,32 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
     */
    void closeConnection(final PoolEntry poolEntry, final String closureReason)
    {
+      logger.debug(
+         "vmware-cred-42-300 in closeConnection(); poolEntry={}; reason={}",
+         poolEntry.getPoolName(),
+         closureReason
+      );
       if (connectionBag.remove(poolEntry)) {
+         logger.debug(
+            "vmware-cred-42-310 remove; poolEntry={}",
+            poolEntry.getPoolName()
+         );
          final Connection connection = poolEntry.close();
          closeConnectionExecutor.execute(() -> {
             quietlyCloseConnection(connection, closureReason);
             if (poolState == POOL_NORMAL) {
+               logger.debug(
+                  "vmware-cred-42-311 now filling the pool; poolEntry={}",
+                  poolEntry.getPoolName()
+               );
                fillPool();
             }
          });
+      } else {
+         logger.debug(
+            "vmware-cred-42-320 NOT removed; poolEntry={};",
+            poolEntry.getPoolName()
+         );
       }
    }
 
