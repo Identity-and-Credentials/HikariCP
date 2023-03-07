@@ -130,8 +130,8 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       final int maxPoolSize = config.getMaximumPoolSize();
       LinkedBlockingQueue<Runnable> addConnectionQueue = new LinkedBlockingQueue<>(maxPoolSize);
       this.addConnectionQueueReadOnlyView = unmodifiableCollection(addConnectionQueue);
-      this.addConnectionExecutor = createThreadPoolExecutor(addConnectionQueue, poolName + " connection adder", threadFactory, new ThreadPoolExecutor.DiscardOldestPolicy());
-      this.closeConnectionExecutor = createThreadPoolExecutor(maxPoolSize, poolName + " connection closer", threadFactory, new ThreadPoolExecutor.CallerRunsPolicy());
+      this.addConnectionExecutor = createThreadPoolExecutor(addConnectionQueue, poolName + " connection adder", threadFactory, new DebugDiscardOldestPolicy());
+      this.closeConnectionExecutor = createThreadPoolExecutor(maxPoolSize, poolName + " connection closer", threadFactory, new DebugCallerRunsPolicy());
 
       this.leakTaskFactory = new ProxyLeakTaskFactory(config.getLeakDetectionThreshold(), houseKeepingExecutorService);
 
@@ -918,6 +918,25 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
       public PoolInitializationException(Throwable t)
       {
          super("Failed to initialize pool: " + t.getMessage(), t);
+      }
+   }
+
+   private class DebugCallerRunsPolicy extends ThreadPoolExecutor.CallerRunsPolicy {
+
+      public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+         logger.debug(
+            "vmware-cred-42-410 rejected execution"
+         );
+         super.rejectedExecution(r,e);
+      }
+   }
+
+   private class DebugDiscardOldestPolicy extends ThreadPoolExecutor.DiscardOldestPolicy {
+      public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+         logger.debug(
+            "vmware-cred-42-420 rejected execution"
+         );
+         super.rejectedExecution(r,e);
       }
    }
 }
